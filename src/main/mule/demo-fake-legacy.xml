@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:json-logger="http://www.mulesoft.org/schema/mule/json-logger" xmlns:anypoint-mq="http://www.mulesoft.org/schema/mule/anypoint-mq" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/anypoint-mq http://www.mulesoft.org/schema/mule/anypoint-mq/current/mule-anypoint-mq.xsd
+http://www.mulesoft.org/schema/mule/json-logger http://www.mulesoft.org/schema/mule/json-logger/current/mule-json-logger.xsd">
+    <http:listener-config name="demo-fake-legacy-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="${http.port}" />
+    </http:listener-config>
+    <apikit:config name="demo-fake-legacy-config" api="resource::0efa2e96-5661-4a95-ab6d-dc1f38566678:demo-fake-legacy:1.0.0:raml:zip:demo-fake-legacy.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <db:config name="Database_Config" doc:name="Database Config" doc:id="7fb887a8-675c-4b1c-8ba7-c5ef2897b125" >
+		<db:my-sql-connection host="database-1.ckiytfooptup.us-east-2.rds.amazonaws.com" port="3306" user="adminMule" password="$3cur3Password" database="demo-mulesoft" />
+	</db:config>
+	<anypoint-mq:config name="Anypoint_MQ_Config" doc:name="Anypoint MQ Config" doc:id="689ef6c8-758e-4a3e-9649-e7c125d44670" >
+		<anypoint-mq:connection url="https://mq-us-west-2.anypoint.mulesoft.com/api/v1" clientId="dea02d088ba544e1ad4cbff655d9f8ee" clientSecret="210C90DCD1044fcda028C6e484bDEB3E" />
+	</anypoint-mq:config>
+	<configuration-properties doc:name="Configuration properties" doc:id="ef21d2a6-2260-470f-8a0e-a21400e6bf80" file="mule-app.properties" />
+	<global-property doc:name="Global Property" doc:id="3f22422c-53f1-493b-b0c8-bf56a9c87088" name="mule-env" value="dev" />
+	<json-logger:config name="JSON_Logger_Config" doc:name="JSON Logger Config" doc:id="7eeae726-3082-4b59-adab-e29f035003eb" environment="${mule-env}" />
+	<flow name="demo-fake-legacy-main">
+        <http:listener config-ref="demo-fake-legacy-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="demo-fake-legacy-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="demo-fake-legacy-console">
+        <http:listener config-ref="demo-fake-legacy-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="demo-fake-legacy-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="get:\prospect:demo-fake-legacy-config">
+        <json-logger:logger doc:name="Start" doc:id="39a31685-7c9e-4061-9814-816f41566db0" config-ref="JSON_Logger_Config" message="Get prospects"/>
+		<db:select doc:name="Select" doc:id="036690d8-760e-4f50-bb1b-b3b8abdd9d61" config-ref="Database_Config">
+			<db:sql ><![CDATA[Select * From `demo-mulesoft`.`Customer`]]></db:sql>
+		</db:select>
+		<ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map ( payload01 , indexOfPayload01 ) -> {
+	address: {
+		country: payload01.Country default "",
+		city: payload01.City default "",
+		street: payload01.Street default "",
+		postalCode: payload01.PostalCode default "",
+		state: payload01.State default ""
+	},
+	phone: payload01.Phone default "",
+	name: payload01.Name default "",
+	id: payload01.idCustomer as String
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+		<json-logger:logger doc:name="End" doc:id="d1cd0d82-176c-43c4-8a72-80fefd278234" config-ref="JSON_Logger_Config" message="Finishing flow" tracePoint="END">
+			<json-logger:content ><![CDATA[#[import modules::JSONLoggerModule output application/json ---
+{
+    payload: ''
+}]]]></json-logger:content>
+		</json-logger:logger>
+    </flow>
+    <flow name="post:\prospect:application\json:demo-fake-legacy-config">
+		<json-logger:logger doc:name="Start" doc:id="deadcfef-2210-416a-aa93-f6b655b2f312" config-ref="JSON_Logger_Config" message="Start create porspect from fake legacy api"/>
+		<set-variable value="#[payload]" doc:name="Set prospect" doc:id="5ae321bf-b743-4cfb-8d54-d0e90881881e" variableName="prospect"/>
+		<db:insert doc:name="Insert" doc:id="4f90a7da-f859-49c6-a7fb-a9ae10c84151" config-ref="Database_Config" autoGenerateKeys="true" >
+			<db:sql ><![CDATA[INSERT INTO `demo-mulesoft`.`Customer`
+(
+`Name`,
+`Phone`,
+`Street`,
+`City`,
+`State`,
+`Country`,
+`PostalCode`,
+`IsMigrated`)
+VALUES
+(
+:Name,
+:Phone,
+:Street,
+:City,
+:State,
+:Country,
+:PostalCode,
+:IsMigrated);]]></db:sql>
+			<db:input-parameters ><![CDATA[#[{
+	'Name': payload.name,
+	'Phone': payload.phone,
+	'Street': payload.address.street,
+	'City': payload.address.city,
+	'State': payload.address.state,
+	'Country': payload.address.country,
+	'PostalCode': payload.address.postalCode,
+	'IsMigrated': 0
+}]]]></db:input-parameters>
+		</db:insert>
+		<json-logger:logger doc:name="Step" doc:id="f7ebc48c-f033-437e-8db7-1370b002f15a" config-ref="JSON_Logger_Config" message="Record created" tracePoint="FLOW">
+			<json-logger:content ><![CDATA[#[import modules::JSONLoggerModule output application/json ---
+{
+    payload: ''
+}]]]></json-logger:content>
+		</json-logger:logger>
+		<anypoint-mq:publish doc:name="Publish" doc:id="f8370b70-c0b0-4498-8b49-db171e886722" config-ref="Anypoint_MQ_Config" destination="Test.Prospect.On.Salesforce">
+			<anypoint-mq:body ><![CDATA[#[vars.prospect]]]></anypoint-mq:body>
+		</anypoint-mq:publish>
+		<json-logger:logger doc:name="Step" doc:id="3243aa9c-f75b-4e9b-89fa-0cbc04d656b5" config-ref="JSON_Logger_Config" message="Message published" tracePoint="FLOW">
+			<json-logger:content ><![CDATA[#[import modules::JSONLoggerModule output application/json ---
+{
+    payload: ''
+}]]]></json-logger:content>
+		</json-logger:logger>
+		<ee:transform doc:name="Transform Message" doc:id="a2a7fd1d-458f-449f-9314-93213a1d9703" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message": "Ok"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<json-logger:logger doc:name="End" doc:id="015d37f0-bb87-4cd0-bcc5-f531c71457c7" config-ref="JSON_Logger_Config" message="Finishing flow" tracePoint="END" >
+			<json-logger:content ><![CDATA[#[import modules::JSONLoggerModule output application/json ---
+{
+    payload: ''
+}]]]></json-logger:content>
+		</json-logger:logger>
+    </flow>
+</mule>
