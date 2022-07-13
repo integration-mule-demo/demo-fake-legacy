@@ -201,6 +201,17 @@ VALUES
 	'IsMigrated': 0
 }]]]></db:input-parameters>
 		</db:insert>
+		<set-variable value="#[payload.generatedKeys[0]]" doc:name="Set generatedId" doc:id="2601c031-23dd-49a6-9c9a-62c0321b242d" variableName="generatedId"/>
+		<ee:transform doc:name="Aggregate Id to Prospect" doc:id="40f391cb-f755-475a-96ee-277fb58daf82" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="prospect" ><![CDATA[%dw 2.0
+output application/json
+---
+vars.prospect ++ {id: vars.generatedId as String}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
 		<json-logger:logger doc:name="Step" doc:id="f7ebc48c-f033-437e-8db7-1370b002f15a" config-ref="JSON_Logger_Config" message="Record created" tracePoint="FLOW">
 			<json-logger:content ><![CDATA[#[import modules::JSONLoggerModule output application/json ---
 {
